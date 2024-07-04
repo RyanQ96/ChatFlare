@@ -1,0 +1,5 @@
+PyPDF2 
+tiktoken
+jupyter
+ipykernel
+-r requirements.txt
