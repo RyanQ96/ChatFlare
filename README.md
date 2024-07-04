@@ -1,6 +1,6 @@
 # <div align="center">ChatFlare</div>
 
-Welcome to **ChatFlare**, the Lightning-fast framework for building and deploying Large Language Models (LLM) applications with ease and efficiency. Inspired by the simplicity and power of PyTorch Lightning, ChatFlare aims to provide a streamlined and modular approach to working with LLM chains.
+Welcome to **ChatFlare**, a Lightning framework for building and prototying Large Language Models (LLM) applications with ease and efficiency. Inspired by the powerful usage of Langchain but with much less abstraction, ChatFlare aims to provide a streamlined and modular approach to working with LLM chains.
 
 ## Overview
 
