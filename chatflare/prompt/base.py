@@ -16,6 +16,9 @@ class PromptTemplate:
         self.template = template
         self._variables = self._get_variables()
 
+    def __repr__(self):
+        return f"PromptTemplate(variables={self.variables}, template={self.template[:1000]})"
+
     def _get_variables(self):
         if self.template:
             formatter = string.Formatter() 
