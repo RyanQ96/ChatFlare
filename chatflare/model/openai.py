@@ -14,14 +14,24 @@ class ChatOpenAI(ModelBase):
         if 'model' not in kwargs: 
             kwargs['model'] = self.model_name
 
-        return self.client.chat.completions.create(
-            **kwargs
-        ).choices[0].message.content
+        if 'return_full_response' not in kwargs or kwargs['return_full_response'] == False: 
+            return self.client.chat.completions.create(
+                **kwargs
+            ).choices[0].message.content
+        else:
+            return self.client.chat.completions.create(
+                **kwargs
+            )
 
     async def aprerdict(self, **kwargs): 
         if 'model' not in kwargs: 
             kwargs['model'] = self.model_name
-            
-        return await self.aclient.chat.completions.create(
-            **kwargs
-        ).choices[0].message.content
+
+        if 'return_full_response' not in kwargs or kwargs['return_full_response'] == False:   
+            return await self.aclient.chat.completions.create(
+                **kwargs
+            ).choices[0].message.content
+        else:
+            return await self.aclient.chat.completions.create(
+                **kwargs
+            )

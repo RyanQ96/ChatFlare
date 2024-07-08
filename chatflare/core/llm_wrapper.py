@@ -8,7 +8,7 @@ class BaseChain:
         self.JSON_MODE = False if 'JSON_MODE' not in kwargs else kwargs['JSON_MODE']
 
     def __repr__(self):
-        return f"BaseChain(model={self.model}, json_mode={self.JSON_MODE}, prompt_template={self.prompt_template} + '...')"
+        return f"BaseChain(model={self.model}, json_mode={self.JSON_MODE}, prompt_template={self.prompt_template})"
 
     def turn_on_json_mode(self):
         self.JSON_MODE = True

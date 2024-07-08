@@ -1,2 +1,6 @@
 openai
+mermaid-py
+matplotlib
 python-dotenv
+PyPDF2 
+tiktoken
