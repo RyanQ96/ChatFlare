@@ -1,9 +1,8 @@
-<h3 align="center">
-  <img
-    src="./assets/image/logo-with-name.png"
-    height="200"
-  >
-</h3>
+<p align="center">
+  <a href="https://github.com/RyanQ96/ChatFlare?tab=readme-ov-file">
+    <img src="./assets/image/logo-with-name.png" alt="" width="40%" align="top" style="border-radius: 10px; padding-left: 120px; padding-right: 120px; background-color: white;">
+  </a>
+</p>
 
 
 Welcome to **ChatFlare**, a Lightning framework for building and prototying Large Language Models (LLM) applications with ease and efficiency. Inspired by the powerful usage of Langchain but with much less abstraction, ChatFlare aims to provide a streamlined and modular approach to working with LLM chains.
