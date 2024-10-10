@@ -3,7 +3,8 @@ import datetime
 import json 
 
 class Task: 
-    def __init__(self, task_type, result, embedding=None):
+    """Task is the smallest unit of action that can be performed in the system"""
+    def __init__(self, task_type=None, result=None, embedding=None):
         self.id = str(uuid.uuid4())
         self.task_type = task_type
         self.timestamp = datetime.datetime.now().isoformat()
@@ -59,10 +60,26 @@ class Branch:
         self.head_commit = head_commit
         self.commits = commits
 
+    @property
+    def length(self):
+        return len(self.commits)
+    
     def add_commit(self, commit_id):
         self.commits.append(commit_id)
         self.head_commit = commit_id
 
+    def rollback(self, commit, inplace=True):
+        if commit not in self.commits:
+            raise ValueError("The commit_id provided is not in the list of commits")
+        idx = self.commits.index(commit)
+        if inplace:
+            self.commits = self.commits[:idx+1]
+            self.head_commit = commit
+        else:
+            new_commits = self.commits[:idx+1]
+            new_branch = Branch(self.branch_name + "_r", head_commit=commit, commits=new_commits)
+            return new_branch
+    
     def to_dict(self):
         return {
             "id": self.id,
@@ -70,13 +87,13 @@ class Branch:
             "commits": [commit.to_dict() for commit in self.commits],
         }   
     
-    def create_new_branch_from_commit(self, branch_name, commit_id):
-        if commit_id not in self.commits:
+    def create_new_branch_from_commit(self, branch_name, commit):
+        if commit not in self.commits:
             raise ValueError("The commit_id provided is not in the list of commits")
         # create a new branch from the commit_id
-        idx = self.commits.index(commit_id) 
+        idx = self.commits.index(commit) 
         new_commits = self.commits[:idx+1]
-        new_branch = Branch(branch_name, head_commit=commit_id, commits=new_commits)
+        new_branch = Branch(branch_name, head_commit=commit, commits=new_commits)
         return new_branch   
     
     def __repr__(self):
@@ -90,7 +107,6 @@ class Branch:
             if commit_idx != 0:
                 commits_display_str += "     Ʌ\n"
                 commits_display_str += "     |\n"
-        return f"Branch: {self.branch_name}\n{'='*25}\n{commits_display_str}"
+        return f"Branch: {self.branch_name if len(self.branch_name) < 17 else self.branch_name[:14] + '...'}\n{'='*25}\n{commits_display_str}"
 
-    
     
