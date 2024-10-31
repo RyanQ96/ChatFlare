@@ -1,3 +1,4 @@
 chatflare-venv/
 notebooks/
 test_history_control/
+tests/.env

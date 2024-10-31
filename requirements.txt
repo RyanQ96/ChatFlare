@@ -4,3 +4,4 @@ matplotlib
 python-dotenv
 PyPDF2 
 tiktoken
+firebase_admin

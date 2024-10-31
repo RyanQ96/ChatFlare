@@ -1,13 +1,15 @@
 import uuid
 import networkx as nx 
 from chatflare.tracker.base import Branch
+from chatflare.graph.memoryinterface import MemoryInterface
 
-class GraphState: 
-    def __init__(self): 
-        self.environment = None 
-        self.latest_input = None 
-        self.latest_output = None 
-        self.memory = None # MemoryBank Object
+class GraphState: ## AKA AgentState
+    """Current state of the agent, including its environment, memory and working_memory"""
+    def __init__(self, environment=None, latest_input=None, latest_output=None, memory=None): 
+        self.environment = environment
+        self.latest_input = latest_input
+        self.latest_output = latest_output
+        self.memory: MemoryInterface = memory # MemoryBank Object
 
     def __repr__(self):
         return f"GraphState(...TO BE IMPLEMENTED...)"
@@ -17,7 +19,7 @@ class GraphState:
 
 
 class GraphTraverseThread: 
-    """Thread contains both the actual data: GraphState and the version tracking: Branch."""
+    """Thread contains both the actual data: GraphState (memory) and the version tracking: Branch."""
     def __init__(self, graph_state:GraphState = None, branch:Branch = None): 
         self.thread_id = uuid.uuid4()
         if graph_state is None:
@@ -48,6 +50,24 @@ class GraphTraverseThread:
         and return the new thread.
         """
         raise NotImplementedError("Method not implemented")
+
+class TaskNode: 
+    def __init__(self, task_name=None, task_func=None):
+        self._NODE_TYPE = "TASK_NODE"
+        self.node_name = f"TaskNode-{str(uuid.uuid4())[:4]}"
+        self.task_name = task_name
+        self.task_func = task_func
+
+    @property 
+    def NODE_TYPE(self):
+        return self._NODE_TYPE
+
+    def __repr__(self):
+        return f"TaskNode(task_name={self.task_name})"
+
+    def __call__(self, graph_state:GraphState): 
+        return self.task_func(graph_state)
+
 
 class RouteNode: 
     def __init__(self, source_node=None, outer_edges=[]):

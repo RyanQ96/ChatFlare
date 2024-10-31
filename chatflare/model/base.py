@@ -12,6 +12,6 @@ class ModelBase(ABC):
         pass
 
     @abstractmethod
-    def aprerdict(self, **kwargs):
+    def apredict(self, **kwargs):
         pass 
         

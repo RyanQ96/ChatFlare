@@ -1,3 +1,5 @@
+"""deprecated module, move to task.py"""
+
 import asyncio
 from ABC import abstractmethod, ABC 
 
