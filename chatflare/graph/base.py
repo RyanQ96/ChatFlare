@@ -169,6 +169,7 @@ class BaseGraph:
         pass 
 
     def resume_traverse(self): 
+        """"""
         pass
 
     def compile(self):
