@@ -1,15 +1,17 @@
 from chatflare.graph.workflow import BaseWorkflow
-
+from chatflare.graph.base import GraphTraverseThread
 import uuid 
 
 class BaseAgent:
     """ Base class for all agents """
-    def __init__(self, agent_name: str=None, workflow: BaseWorkflow=None, environment=None): 
+    def __init__(self, agent_name: str=None, workflow: BaseWorkflow=None, environment=None, thread=None): 
         """"""
         self.agent_id = str(uuid.uuid4())
         self.agent_name: str = agent_name
         self.workflow: BaseWorkflow = workflow.bind_to_agent(self) if workflow is not None else None
         self.environment = environment 
+        self.active_thread = thread
+        self.threads = {} 
         
     def register_workflow(self, workflow: BaseWorkflow):    
         self.workflow = workflow.bind_to_agent(self)
@@ -20,10 +22,11 @@ class BaseAgent:
     ## TODO: Implement start of the workflow interface on agent, connect to workflow 
     def start_workflow(self):
         pass
+
+    def initialize_thread(self, thread: GraphTraverseThread):
+        self.active_thread = thread
+        self.threads[thread.thread_id] = thread
     
-    # def 
-    
-     
     def __repr__(self):
         return f"{getattr(self, 'agent_name', 'unknown_agent')}"
     

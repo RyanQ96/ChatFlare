@@ -6,10 +6,19 @@ class BaseChain:
         self.model = model 
         self.prompt_template = prompt_template  
         self.JSON_MODE = False if 'JSON_MODE' not in kwargs else kwargs['JSON_MODE']
-
+        
+        if 'json_mode' in kwargs and kwargs['json_mode']:
+            self.turn_on_json_mode()
+    
     def __repr__(self):
-        return f"BaseChain(model={self.model}, json_mode={self.JSON_MODE}, prompt_template={self.prompt_template})"
+        return f"BaseChain(model={self.model}, json_mode={self.JSON_MODE}, prompt_template={self.prompt_template.variables})"
 
+    @property
+    def variables(self):
+        if self.prompt_template:
+            return self.prompt_template.variables
+        return []
+    
     def turn_on_json_mode(self):
         self.JSON_MODE = True
 

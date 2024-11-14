@@ -1,6 +1,13 @@
 from abc import ABC, abstractmethod
 from typing import Any, List, Dict, Tuple, Optional, Iterable, Union
-from some_module import EmbeddingDocument, Document  # Replace `some_module` with the actual module where these are defined
+# from some_module import EmbeddingDocument, Document  # Replace `some_module` with the actual module where these are defined
+
+class EmbeddingDocument: 
+    pass 
+
+class Document:
+    pass
+
 
 class MemoryInterface(ABC):
     """Interface for interacting with a memory bank."""
@@ -31,4 +38,39 @@ class MemoryInterface(ABC):
 
     @abstractmethod
     def output_memories_hierarchy(self, inner_memories: Optional[List[Document]] = None) -> Dict[str, Any]:
+        pass
+
+    @abstractmethod
+    def add_memory_from_commit(self, commit): 
+        pass
+
+    @abstractmethod
+    def delete(self, ids: List[str]) -> bool:
+        pass
+
+    @abstractmethod 
+    def get_new_memory_from_ids(self, ids: List[str]) -> "MemoryInterface":
+        pass    
+    
+    
+    @property
+    @abstractmethod
+    def all_document_ids(self) -> List[str]:
+        pass
+    
+    @classmethod
+    @abstractmethod
+    def from_texts(
+        cls,
+        texts: List[str],
+        embedding: Any,
+        metadatas: Optional[List[dict]] = None,
+        ids: Optional[List[str]] = None,
+        **kwargs: Any,
+    ) -> "MemoryInterface":
+        pass
+
+    @classmethod
+    @abstractmethod
+    def initialize_memory(cls, embedding = None, dim:int=1536):
         pass

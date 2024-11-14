@@ -2,8 +2,8 @@ from chatflare.graph.base import BaseGraph
 
 
 class BaseWorkflow(BaseGraph):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, thread):
+        super().__init__(thread)
         self.agent = None # host agent of the task 
 
     def __repr__(self):
