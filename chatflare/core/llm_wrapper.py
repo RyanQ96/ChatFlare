@@ -37,6 +37,7 @@ class BaseChain:
                 }
             ],
             model=self.model.model_name,
+            temperature=0.2, 
             **outer_kwargs
         )
     
@@ -55,6 +56,7 @@ class BaseChain:
                 }
             ],
             model=self.model.model_name,
+            temperature=0.2, 
             **outer_kwargs
         )
 

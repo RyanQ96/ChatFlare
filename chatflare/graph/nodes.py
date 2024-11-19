@@ -45,7 +45,7 @@ class RouteNode:
     def __repr__(self):
         return f"RouteNode(source_node={self.source_node})"
 
-    def add_target_node(self, edge, runnable):
+    def add_target_node(self, edge, runnable, priority=0):
         if edge not in self.outer_edges:
             self.outer_edges.append(edge)
 
@@ -63,6 +63,11 @@ class LLMTaskNode(TaskNode):
         """
         self.action = action
 
+    def predict(self, thread): 
+        output = self.action.run(thread)
+        thread.graph_state.update_state(output)
+        return output
+
     async def __call__(self, thread): 
         output = await self.action.arun(thread)
         thread.graph_state.update_state(output)
@@ -71,3 +76,28 @@ class LLMTaskNode(TaskNode):
     @classmethod
     def from_action(cls, action: BaseAction):
         return cls(task_name=action.action_name, action=action)
+
+        
+class HumanInstructionNode(TaskNode):
+    def __init__(self, task_name=None, action: BaseAction=None):
+        super().__init__(task_name=task_name, action=action)
+        self._NODE_TYPE = "HUMAN_INSTRUCTION_NODE"
+
+    def __repr__(self):
+        return f"HumanInstructionNode(task_name={self.task_name})"
+    
+    def setup_task(self, action: BaseAction): 
+        """
+        Setup the task function for the node, auto-check input parameter required
+        """
+        self.action = action
+
+    async def __call__(self, thread): 
+        output = await self.action.arun(thread)
+        thread.graph_state.update_state(output)
+        return output
+
+    @classmethod
+    def from_action(cls, action: BaseAction):
+        return cls(task_name=action.action_name, action=action)
+
