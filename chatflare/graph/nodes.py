@@ -30,12 +30,22 @@ class TaskNode:
         """
         self.task_func = task_func
 
+
+class ENDNODE: 
+    def __init__(self):
+        self._NODE_TYPE = "END_NODE"
+        self.node_name = "ENDNODE"
+        
+    def __repr__(self):
+        return f"ENDNODE()"
+
+
 class RouteNode: 
-    def __init__(self, source_node=None, outer_edges=[], leverage_llm=False):
+    def __init__(self, source_node=None, outer_edges=None, leverage_llm=False):
         self._NODE_TYPE = "ROUTE_NODE"
         self.node_name = f"RouteNode-{str(uuid.uuid4())[:4]}"
         self.source_node = source_node
-        self.outer_edges = outer_edges
+        self.outer_edges = outer_edges or []
         self.leverage_llm = leverage_llm
     
     @property 
@@ -69,6 +79,7 @@ class LLMTaskNode(TaskNode):
         return output
 
     async def __call__(self, thread): 
+        print("there check")
         output = await self.action.arun(thread)
         thread.graph_state.update_state(output)
         return output

@@ -6,3 +6,5 @@ PyPDF2
 tiktoken
 firebase_admin
 mermaid-py
+tenacity
+networkx

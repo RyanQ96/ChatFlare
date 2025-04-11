@@ -1,0 +1,1 @@
+2025-01-08 11:30:53.537242, [ASYNC] Model: meta.llama3-3-70b-instruct-v1:0, Prompt tokens: 386, Completion tokens: 21, Total tokens: 407

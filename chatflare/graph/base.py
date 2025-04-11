@@ -4,26 +4,31 @@ import warnings
 from typing import Union, List, Dict, Any
 from chatflare.tracker.base import Branch
 from chatflare.graph.memoryinterface import MemoryInterface
+from agent_card_server.ActionChatFlare.report import ReportGenerationAction
 from chatflare.tracker import Commit, Branch, Blob
 from chatflare.agent.task import SRTask
 from .nodes import RouteNode
+from chatflare.utils.print import log_action_res
+
 
 class GraphState: 
     """AgentState, current state of the agent, including its environment, memory and working_memory"""
-    def __init__(self, environment=None, latest_input=None, latest_output=None, memory:MemoryInterface=None, paper_visited_in_commits={}, agent_current_position=None, conversation_history=[]): 
+    def __init__(self, environment=None, latest_input=None, latest_output=None, memory:MemoryInterface=None, paper_visited_in_commits=None, human_cached_instructions=None, agent_current_position=None, conversation_history=None, cached_work=None, agent=None): 
         self.environment = environment
         self.latest_input = latest_input
         self.latest_output = latest_output
         self.memory: MemoryInterface = memory # MemoryBank Object
-        self.agent = None 
-        self.human_cached_instructions = [] 
-        self.conversation_history = conversation_history
+        self.agent = agent
+        self.human_cached_instructions = human_cached_instructions or []
+        self.conversation_history = conversation_history or []
         self.agent_current_position = agent_current_position
-        self.paper_visited_in_commits = paper_visited_in_commits # list of papers id visited
-        self.cached_work = {
+        self.paper_visited_in_commits = paper_visited_in_commits or {} # list of papers id visited
+        self.finish_all_articles = False 
+        _default_cached_work = {
             "papers_to_read": [], ## List of EmbeddingDocument
             "papers_to_synthesize": [] ## List of EmbeddingDocument.docstore_id
         }
+        self.cached_work = cached_work or _default_cached_work
 
     @property
     def visited_paperids(self):
@@ -31,6 +36,7 @@ class GraphState:
         for commit, docs in self.paper_visited_in_commits.items(): 
             res.update(docs)
         return list(res) 
+
         
     def add_human_instruction(self, instruction):
         self.human_cached_instructions.append(instruction)
@@ -55,12 +61,12 @@ class GraphState:
         """
         if inplace:
             commits = branch.commits
+            commitIds = [commit.id for commit in commits]
+            head_commit = branch.head_commit 
+            head_blob = head_commit.blobs[0]
             # update documents_visited_in_commits
-            for c in self.document_visited_in_commits: 
-                if c not in commits:
-                    ## remove c.id as key of the dict   
-                    self.document_visited_in_commits.pop(c)
-            
+            remained_paper_visited_in_commits = {commitId: docs for commitId, docs in self.paper_visited_in_commits.items() if commitId in commitIds}
+            self.paper_visited_in_commits = remained_paper_visited_in_commits
             target_tasks = [] 
             for c in commits: 
                 if c.blobs:
@@ -73,41 +79,48 @@ class GraphState:
             self.memory.delete(docs_ids_to_be_removed)
 
             for commit in commits[::-1]:
-                if commit.blobs[0].result["meta"].get("thought"):
+                if commit.blobs[0].result.get("meta") and commit.blobs[0].result["meta"].get("thought"):
                     self.memory.working_memory = commit.blobs[0].result["meta"]["thought"]
                     break
             
             for commit in commits[::-1]:
-                if commit.blobs[0].result["meta"].get("inspiration_from_conversation"):
+                if commit.blobs[0].result.get("meta") and commit.blobs[0].result["meta"].get("inspiration_from_conversation"):
                     self.memory.inspiration_conversation_history = commit.blobs[0].result["meta"]["inspiration_from_conversation"]
                     break
             
             for commit in commits[::-1]:
-                if commit.blobs[0].result.get("agent_current_position"):
+                if commit.blobs[0].result.get("meta") and commit.blobs[0].result.get("agent_current_position"):
                     self.agent_current_position = commit.blobs[0].result["agent_current_position"]
                     break
-            ## TODO: update the lastest_input and latest_output, working memory and inspiration_conversation_history
+
+            self.finish_all_articles = False
+            self.cached_work = head_blob.result.get("cached_work", self.cached_work)
+            print("reset cached work")
             return self
         else: 
             commits = branch.commits
-            updated_documents_visited_in_commits = {commitId: docs for commitId, docs in self.paper_visited_in_commits.items() if commitId in commits}
+            commitIds = [commit.id for commit in commits]
+            updated_documents_visited_in_commits = {commitId: docs for commitId, docs in self.paper_visited_in_commits.items() if commitId in commitIds}
             
             target_tasks = [] 
             for c in commits: 
                 if c.blobs:
                     target_tasks.extend(c.blobs)
-
+            print("old_memory")
+            print(self.memory.docstore._dict) 
             new_memory_docs_ids = [task.id for task in target_tasks] # this should be the id for document as well 
             new_memory = self.memory.get_new_memory_from_ids(new_memory_docs_ids)
-            
+            print(type(new_memory))
+            print("new_memory")
+            print(new_memory.docstore._dict) 
             ## Figure out working memory and inspiration_conversation_history
             for commit in commits[::-1]:
-                if commit.blobs[0].result["meta"].get("thought"):
+                if commit.blobs[0].result.get("meta") and commit.blobs[0].result["meta"].get("thought"):
                     new_memory.working_memory = commit.blobs[0].result["meta"]["thought"]
                     break
             
             for commit in commits[::-1]:
-                if commit.blobs[0].result["meta"].get("inspiration_from_conversation"):
+                if commit.blobs[0].result.get("meta") and commit.blobs[0].result.get("meta").get("inspiration_from_conversation"):
                     new_memory.inspiration_conversation_history = commit.blobs[0].result["meta"]["inspiration_from_conversation"]
                     break
             
@@ -116,9 +129,8 @@ class GraphState:
                 if commit.blobs[0].result.get("agent_current_position"):
                     updated_agent_current_position = commit.blobs[0].result["agent_current_position"]
                     break
-           
-            ## TODO: update the lastest_input and latest_output
-            return GraphState(environment=self.environment, latest_input=self.latest_input, latest_output=self.latest_output, memory=new_memory, paper_visited_in_commits=updated_documents_visited_in_commits, agent_current_position=updated_agent_current_position, conversation_history=self.conversation_history)
+            newstate = GraphState(environment=self.environment, latest_input=self.latest_input, latest_output=self.latest_output, memory=new_memory, paper_visited_in_commits=updated_documents_visited_in_commits, agent_current_position=updated_agent_current_position, conversation_history=self.conversation_history, agent=self.agent)
+            return newstate
         
 
 
@@ -135,8 +147,34 @@ class GraphTraverseThread:
         self.agent = agent
         self.task = task
 
-    def create_default_branch(self):
-        return Branch("default")
+    @property
+    def client_handler(self):
+        return self.graph_state.agent.client_handler
+
+    @property 
+    def article_processing_history(self):
+        res = {} 
+        for commit in self.branch.commits:
+            if commit.blobs:
+                blob = commit.blobs[0]
+                task_type = blob.task_type
+                if task_type == "retrieve": 
+                    reception_field = blob.result["meta"]["reception_field_papers"]
+                    for docId in reception_field:
+                        res[docId] = "visited"
+                elif task_type == "read":
+                    decision = 'exclude' if blob.result["content"] == 'exclude' else 'include' 
+                    docId = blob.result["meta"]["paper_id"]
+                    res[docId] = decision 
+                else:
+                    continue
+            else:
+                continue
+        return res
+    
+
+    def create_default_branch(self) -> Branch:
+        return Branch("default", agent_id=self.graph_state.agent.agent_id, client_handler=self.client_handler)
 
     def create_default_graph_state(self) -> GraphState:
         warnings.warn("Memory is not initialized.")
@@ -144,10 +182,9 @@ class GraphTraverseThread:
 
     def add_commit(self, commit):
         self.branch.add_commit(commit)
-        if commit.blobs:
+        if commit.blobs and not commit.human_interaction:
             self.graph_state.memory.add_memory_from_commit(commit)
-        else:
-            warnings.warn("Incomplete commit. No blobs found.")
+        
 
     def rollback(self, commitOrId: Union[str, Commit], inplace=False):
         """
@@ -168,6 +205,8 @@ class GraphTraverseThread:
             new_graph_state = self.graph_state.sync_with_branch(new_branch, inplace=False)
             ## 3: return the new thread
             return GraphTraverseThread(graph_state=new_graph_state, branch=new_branch, agent=self.agent, task=self.task)
+
+    
             
     def create_new_thread_from_branch(self, branch:Branch):
         """ 
@@ -186,6 +225,9 @@ class BaseGraph:
         self.start_node = None 
         self.end_node = None 
         self.current_node = None
+        self.retrieve_node = None
+        self.synthesis_node = None
+        self.read_node = None
         self.TRAVERSE_MAX_DEPTH = 5
         self.human_instruction_node = None        
         self.num_traversed = 0 
@@ -252,7 +294,6 @@ class BaseGraph:
         candidate_edges = self.graph.out_edges(from_node)
         _, router_node = list(candidate_edges)[0]
 
-        
         candidate_edges = self.graph.out_edges(router_node)
         edge_check_map = {} 
         for edge in candidate_edges: 
@@ -271,8 +312,9 @@ class BaseGraph:
             print(f"Next node: {true_edges[0].node_name}")
             return true_edges[0]
         else:
-            print("No edge is True. Please check your edge conditions.")
-            raise ValueError("No edge is True. Please check your edge conditions.")
+            print(f"No edge is True from {from_node.node_name} Please check your edge conditions.")
+            print(self.traverse_thread.graph_state.cached_work)
+            raise ValueError(f"No edge is True from {from_node.node_name}, Please check your edge conditions.")
 
     async def traverse(self): 
         if self.current_node is None: 
@@ -282,23 +324,48 @@ class BaseGraph:
             next_node = self.route(self.current_node)
             self.current_node = next_node
             self.num_traversed += 1 
+            agent = self.traverse_thread.agent or self.traverse_thread.graph_state.agent
+            agent.report_agent_working_progress()
 
-            
     async def arun(self, node=None): 
-        self.working_status = "RUNNING"
-        async for output in self.traverse():
-            if self.current_node._NODE_TYPE == "HUMAN_INSTRUCTION_NODE" and (not output.get("whether_to_continue_workflow", False)):             
-                self.working_status = "PAUSED" 
-                break
-            elif self.current_node._NODE_TYPE == "HUMAN_INSTRUCTION_NODE" and output.get("whether_to_continue_workflow", False):
-                print("Human instruction node is completed.")
-                continue
-            else:
-                continue
-        if self.current_node == self.end_node:
-            self.working_status = "COMPLETED"
-        elif self.num_traversed >= self.TRAVERSE_MAX_DEPTH: 
-            self.working_status = "REACHED_MAX_DEPTH"
+        try: 
+            self.working_status = "RUNNING"
+            
+            agent = self.traverse_thread.agent or self.traverse_thread.graph_state.agent
+            agent.report_agent_working_progress()
+            
+            if self.num_traversed >= self.TRAVERSE_MAX_DEPTH:
+                self.TRAVERSE_MAX_DEPTH += 5
+
+            if node is not None: 
+                self.current_node = node
+
+            async for output in self.traverse():
+                
+                if self.current_node._NODE_TYPE == "HUMAN_INSTRUCTION_NODE" and (not output.get("whether_to_continue_workflow", False)):             
+                    self.working_status = "PAUSED" 
+                    break
+                elif self.current_node._NODE_TYPE == "HUMAN_INSTRUCTION_NODE" and output.get("whether_to_continue_workflow", False):
+                    print("Human instruction node is completed.")
+                    continue
+                else:
+                    continue
+            if self.current_node == self.end_node:
+                self.working_status = "COMPLETED"
+            elif self.num_traversed >= self.TRAVERSE_MAX_DEPTH: 
+                self.working_status = "REACHED_MAX_DEPTH"
+            
+            agent.report_agent_working_progress()
+            log_action_res(f"Traverse completed. Working status: {self.working_status}")
+        except Exception as e: 
+            print(e)
+            if self.current_node == self.end_node:
+                self.working_status = "COMPLETED"
+            elif self.num_traversed >= self.TRAVERSE_MAX_DEPTH: 
+                self.working_status = "REACHED_MAX_DEPTH"
+            else: 
+                self.working_status = "PAUSED"
+            agent.report_agent_working_progress()
 
                 
     async def take_human_instruction(self, instruction: str):
@@ -306,8 +373,15 @@ class BaseGraph:
         if self.working_status == "PAUSED" or self.working_status == "IDLE" or self.working_status == "COMPLETED" or self.working_status == "REACHED_MAX_DEPTH":
             if self.num_traversed >= self.TRAVERSE_MAX_DEPTH:
                 self.TRAVERSE_MAX_DEPTH += 1
-            self.current_node = self.human_instruction_node
-            await self.arun()
+        self.current_node = self.human_instruction_node
+        await self.arun() 
+
+    
+    async def report_generation(self,  agents, cardId, client_handler, query=None, inclusion_exclusion_criteria=None, user_specified_requirement=None, summarization_requirement=None):
+        report_action = ReportGenerationAction() 
+        await report_action.arun(
+            agents, cardId, client_handler, query=query, inclusion_exclusion_criteria=inclusion_exclusion_criteria, user_specified_requirement=user_specified_requirement, summarization_requirement=summarization_requirement
+        ) 
 
         
     def pause_traverse(self): 

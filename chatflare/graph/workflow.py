@@ -6,6 +6,7 @@ class BaseWorkflow(BaseGraph):
         super().__init__(thread)
         self.agent = None # host agent of the task 
 
+
     def __repr__(self):
         return f"BaseTask(...TO BE IMPLEMENTED...)"
     

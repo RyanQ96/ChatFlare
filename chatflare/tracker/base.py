@@ -3,6 +3,8 @@ import uuid
 import datetime 
 import json 
 
+from agent_card_server.connection.firebase_handler import create_branch, save_commit
+
 
 class Blob: 
     """Blob is the smallest unit of action that can be performed in the system"""
@@ -27,7 +29,7 @@ class Blob:
             "id": self.id,
             "task_type": self.task_type,
             "timestamp": self.timestamp,
-            "result": self.result,
+            "result": {key: value for key, value in self.result.items() if key != "cached_work"},
             "embedding": self.embedding
         }
 
@@ -49,11 +51,13 @@ class Blob:
 
 class Commit: 
     """commit can potentially involve multiple action, so it should have its own id"""
-    def __init__(self, action_ids: Union[str, List[str]], parent_commit_id=None, blobs: Union[Blob, List[Blob]]=None):
+    def __init__(self, action_ids: Union[str, List[str]], parent_commit_id=None, blobs: Union[Blob, List[Blob]]=None, human_interaction=False):
         self.id = str(uuid.uuid4())
+        self.index_in_branch = None
         self.action_ids = action_ids if isinstance(action_ids, list) else [action_ids]
         self.parent_commit = parent_commit_id
         self.timestamp = datetime.datetime.now().isoformat()
+        self.human_interaction = human_interaction
         if blobs is not None:
             self.blobs = blobs if isinstance(blobs, list) else [blobs]
         else:
@@ -65,36 +69,48 @@ class Commit:
             "action_ids": self.action_ids,
             "parent_commit_id": self.parent_commit,
             "timestamp": self.timestamp,
+            "blob": self.blobs[0].to_dict() if self.blobs is not None else None
         }
 
     def __repr__(self):
         return f"Commit {self.id[:8]}"
     
     @classmethod 
-    def from_blobs(cls, blobs: Union[Blob, List[Blob]]):
+    def from_blobs(cls, blobs: Union[Blob, List[Blob]], human_interaction=False):
         if isinstance(blobs, list):
-            return cls([b.id for b in blobs], parent_commit_id=None, blobs=blobs)
-        return cls([blobs.id], parent_commit_id=None, blobs=[blobs])
+            return cls([b.id for b in blobs], parent_commit_id=None, blobs=blobs, human_interaction=human_interaction)
+        return cls([blobs.id], parent_commit_id=None, blobs=[blobs], human_interaction=human_interaction)
 
 
 class Branch: 
-    def __init__(self, branch_name='main', head_commit=None, commits: List[Commit]=[]):
+    def __init__(self, branch_name='main', head_commit=None, commits: List[Commit]=None, agent_id=None, client_handler=None):
         self.id = str(uuid.uuid4())
         self.branch_name = branch_name
         self.head_commit = head_commit
-        self.commits = commits
-        if head_commit is None and len(commits) > 0:
+        self.commits = commits or []
+        self.agent_id = agent_id
+        self.client_handler = client_handler
+        if head_commit is None and len(self.commits) > 0:
             self.head_commit = commits[-1]
-
+        
+        if self.client_handler is not None and self.client_handler.in_user_study and self.agent_id: 
+            create_branch(self.client_handler.user_study_config["user_study_id"], self.agent_id, self.id, datetime.datetime.now().isoformat())
+            for commit in self.commits:
+                save_commit(self.client_handler.user_study_config["user_study_id"], self.agent_id, self.id, commit)
+        
     @property
     def length(self):
         return len(self.commits)
     
-    def add_commit(self, commit_id):
-        self.commits.append(commit_id)
-        self.head_commit = commit_id
+    def add_commit(self, commit):
+        commit.index_in_branch = len(self.commits)
+        self.commits.append(commit)
+        self.head_commit = commit
 
-    def rollback(self, commitOrId: Union[str, Commit], inplace=True, new_branch_name=None):
+        if self.client_handler is not None and self.client_handler.in_user_study and self.agent_id:
+            save_commit(self.client_handler.user_study_config["user_study_id"], self.agent_id, self.id, commit)
+
+    def rollback(self, commitOrId: Union[str, Commit, None]=None, inplace=True, new_branch_name=None):
         if isinstance(commitOrId, Commit):
             commitId = commitOrId.id
         else:
@@ -110,7 +126,7 @@ class Branch:
         else:   
             new_commits = self.commits[:idx+1]
             new_branch_name = new_branch_name if new_branch_name is not None else self.branch_name + str(uuid.uuid4())[:4]
-            new_branch = Branch(new_branch_name, head_commit=commit, commits=new_commits)
+            new_branch = Branch(new_branch_name, head_commit=commit, commits=new_commits, agent_id=self.agent_id, client_handler=self.client_handler)
             return new_branch
     
     def _get_commit_with_commitid(self, commit_id):
@@ -133,7 +149,7 @@ class Branch:
         # create a new branch from the commit_id
         idx = self.commits.index(commit) 
         new_commits = self.commits[:idx+1]
-        new_branch = Branch(branch_name, head_commit=commit, commits=new_commits)
+        new_branch = Branch(branch_name, head_commit=commit, commits=new_commits, agent_id=self.agent_id, client_handler=self.client_handler)
         return new_branch   
     
     def __repr__(self):

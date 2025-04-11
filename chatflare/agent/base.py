@@ -4,14 +4,16 @@ import uuid
 
 class BaseAgent:
     """ Base class for all agents """
-    def __init__(self, agent_name: str=None, workflow: BaseWorkflow=None, environment=None, thread=None): 
+    def __init__(self, agent_id:str=None, agent_name: str=None, workflow: BaseWorkflow=None, environment=None, thread=None): 
         """"""
-        self.agent_id = str(uuid.uuid4())
+        self.agent_id = agent_id or "IRAgent-" + str(uuid.uuid4())[:4]
         self.agent_name: str = agent_name
         self.workflow: BaseWorkflow = workflow.bind_to_agent(self) if workflow is not None else None
         self.environment = environment 
         self.active_thread = thread
         self.threads = {} 
+        if thread is not None:
+            self.threads[thread.thread_id] = thread
         
     def register_workflow(self, workflow: BaseWorkflow):    
         self.workflow = workflow.bind_to_agent(self)
@@ -23,7 +25,7 @@ class BaseAgent:
     def start_workflow(self):
         pass
 
-    def initialize_thread(self, thread: GraphTraverseThread):
+    def register_thread(self, thread: GraphTraverseThread):
         self.active_thread = thread
         self.threads[thread.thread_id] = thread
     
